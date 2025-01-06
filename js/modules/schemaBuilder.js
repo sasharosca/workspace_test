@@ -36,8 +36,22 @@ export class SchemaBuilder {
 
   addVariableUI(container, variableData=null) {
     const variableBlock = createElement('div', {className:'variable-entry'});
-    variableBlock.innerHTML = `
-      <h3>Variable</h3>
+    
+    // Create header for collapsible section
+    const header = createElement('div', {className:'variable-header'});
+    const summary = createElement('div', {className:'variable-summary'});
+    summary.innerHTML = `
+      <span class="variable-name-display">New Variable</span>
+      <span class="variable-type-display">enum</span>
+      <span class="variable-values-count">0 values</span>
+    `;
+    header.appendChild(summary);
+    variableBlock.appendChild(header);
+
+    // Create content section
+    const content = createElement('div', {className:'variable-content'});
+    content.innerHTML = `
+      <h3>Variable Details</h3>
       <label>Variable Name:</label><input type="text" class="var-name" placeholder="e.g. Level"><br/>
       <label>Type:</label>
       <select class="var-type">
@@ -56,38 +70,70 @@ export class SchemaBuilder {
       <div class="conditionsContainer"></div>
       <button type="button" class="addConditionGroupBtn">Add Condition Group</button>
     `;
+    variableBlock.appendChild(content);
     container.appendChild(variableBlock);
 
-    const varTypeSelect = variableBlock.querySelector('.var-type');
-    variableBlock.querySelector('.addConditionGroupBtn').addEventListener('click', () => {
-      this.addConditionGroupUI(variableBlock.querySelector('.conditionsContainer'));
+    // Setup event listeners
+    header.addEventListener('click', () => {
+      variableBlock.classList.toggle('expanded');
     });
-    variableBlock.querySelector('.addValueBtn').addEventListener('click', () => {
-      this.addValueUI(variableBlock.querySelector('.valuesContainer'));
+
+    const updateSummary = () => {
+      const nameDisplay = summary.querySelector('.variable-name-display');
+      const typeDisplay = summary.querySelector('.variable-type-display');
+      const valuesCountDisplay = summary.querySelector('.variable-values-count');
+      
+      const name = content.querySelector('.var-name').value.trim() || 'New Variable';
+      const type = content.querySelector('.var-type').value;
+      const valuesCount = content.querySelectorAll('.value-entry').length;
+      
+      nameDisplay.textContent = name;
+      typeDisplay.textContent = type;
+      valuesCountDisplay.textContent = `${valuesCount} value${valuesCount !== 1 ? 's' : ''}`;
+    };
+
+    const varTypeSelect = content.querySelector('.var-type');
+    const nameInput = content.querySelector('.var-name');
+
+    [varTypeSelect, nameInput].forEach(el => {
+      el.addEventListener('change', updateSummary);
+      el.addEventListener('input', updateSummary);
+    });
+
+    content.querySelector('.addConditionGroupBtn').addEventListener('click', () => {
+      this.addConditionGroupUI(content.querySelector('.conditionsContainer'));
+    });
+    content.querySelector('.addValueBtn').addEventListener('click', () => {
+      this.addValueUI(content.querySelector('.valuesContainer'));
+      updateSummary();
       this.triggerSchemaUpdate();
     });
 
     if (variableData) {
       this.populateVariableData(variableBlock, variableData);
+      updateSummary();
     }
 
+    // Expand newly created variables by default
+    variableBlock.classList.add('expanded');
     return variableBlock;
   }
 
   populateVariableData(block, data) {
-    block.querySelector('.var-name').value = data.name || '';
-    block.querySelector('.var-type').value = data.type || 'enum';
-    if (data.description) block.querySelector('.var-desc').value = data.description;
+    const content = block.querySelector('.variable-content');
+    content.querySelector('.var-name').value = data.name || '';
+    content.querySelector('.var-type').value = data.type || 'enum';
+    if (data.description) content.querySelector('.var-desc').value = data.description;
     
     if (data.values && Array.isArray(data.values)) {
       data.values.forEach(valObj => {
-        const valContainer = block.querySelector('.valuesContainer');
+        const valContainer = content.querySelector('.valuesContainer');
         this.addValueUI(valContainer, valObj, data.type);
       });
     }
     
     if (data.conditions) {
-      this.populateConditions(block.querySelector('.conditionsContainer'), data.conditions);
+      this.populateConditions(content.querySelector('.conditionsContainer'), data.conditions);
     }
   }
 

@@ -41,8 +41,67 @@ h3, h4 {
   background: #f8f9fa;
   border: 1px solid #e9ecef;
   border-radius: 6px;
+  padding: 0;
+  margin-bottom: 8px;
+  transition: all 0.3s ease;
+}
+
+.variable-header {
+  display: flex;
+  align-items: center;
+  padding: 12px 15px;
+  cursor: pointer;
+  background: #fff;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.variable-header:hover {
+  background: #f8f9fa;
+}
+
+.variable-summary {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.variable-name-display {
+  font-weight: 600;
+  color: #2c3e50;
+  min-width: 120px;
+}
+
+.variable-type-display {
+  color: #6c757d;
+  font-size: 0.9em;
+  padding: 2px 8px;
+  background: #e9ecef;
+  border-radius: 12px;
+}
+
+.variable-values-count {
+  color: #6c757d;
+  font-size: 0.9em;
+}
+
+.variable-content {
   padding: 15px;
-  margin-bottom: 15px;
+  display: none;
+}
+
+.variable-entry.expanded .variable-content {
+  display: block;
+}
+
+.variable-entry.expanded {
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Improve nested components */
+.condition-group, .condition-entry, .value-entry {
+  margin-left: 15px;
+  margin-right: 15px;
 }
 
 .condition-group {
@@ -142,8 +201,23 @@ button.addValueBtn:hover, button.addConditionGroupBtn:hover, button.addCondition
 }
 
 .info-field {
-  background: #e9ecef;
+  background: #e3f2fd;
+  border-left: 4px solid #1976d2;
+  color: #1976d2;
   padding: 10px;
   border-radius: 4px;
   margin-top: 8px;
+}
+
+.info-field.active {
+  background: #e3f2fd;
+  border-left: 4px solid #1976d2;
+  color: #1976d2;
+}
+
+.info-field.inactive {
+  background: #f5f5f5;
+  border-left: 4px solid #9e9e9e;
+  color: #757575;
+  opacity: 0.8;
 } 

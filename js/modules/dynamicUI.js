@@ -88,19 +88,37 @@ export class DynamicUI {
 
   renderInfoVariable(block, variable) {
     block.querySelectorAll('.info-field').forEach(n => n.remove());
-    let matched = [];
     
     if (variable.values && variable.values.length > 0) {
       variable.values.forEach(vObj => {
-        if (evaluateConditions(vObj.conditions || {}, this.currentSelections)) {
-          matched.push(vObj);
+        const conditions = vObj.conditions || {};
+        
+        // Check if any condition group explicitly disqualifies this value
+        const isDisqualified = Object.entries(conditions).some(([logic, condArray]) => {
+          if (logic === 'allOf') {
+            // For AND logic, if any condition conflicts with current selection, it's disqualified
+            return condArray.some(cond => {
+              const [varName, requiredValue] = Object.entries(cond)[0];
+              const currentValue = this.currentSelections[varName];
+              return currentValue && currentValue !== requiredValue;
+            });
+          } else if (logic === 'anyOf') {
+            // For OR logic, if all conditions conflict with current selections, it's disqualified
+            return condArray.length > 0 && condArray.every(cond => {
+              const [varName, requiredValue] = Object.entries(cond)[0];
+              const currentValue = this.currentSelections[varName];
+              return currentValue && currentValue !== requiredValue;
+            });
+          }
+          return false;
+        });
+
+        if (!isDisqualified) {
+          const infoField = createElement('div', {
+            className: 'info-field'
+          }, [vObj.description]);
+          block.appendChild(infoField);
         }
-      });
-    }
-    
-    if (matched.length > 0) {
-      matched.forEach(vObj => {
-        block.appendChild(createElement('div', {className: 'info-field'}, [vObj.description]));
       });
     } else if (variable.description) {
       block.appendChild(createElement('div', {className: 'info-field'}, [variable.description]));
