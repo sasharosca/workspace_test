@@ -46,6 +46,14 @@ export class SchemaBuilder {
       <span class="variable-values-count">0 values</span>
     `;
     header.appendChild(summary);
+    
+    // Add delete button
+    const deleteBtn = createElement('button', {
+      className: 'delete-variable-btn',
+      type: 'button'
+    }, ['×']);
+    header.appendChild(deleteBtn);
+    
     variableBlock.appendChild(header);
 
     // Create content section (collapsed by default)
@@ -74,8 +82,20 @@ export class SchemaBuilder {
     container.appendChild(variableBlock);
 
     // Setup event listeners
-    header.addEventListener('click', () => {
-      variableBlock.classList.toggle('expanded');
+    header.addEventListener('click', (e) => {
+      // Don't toggle if clicking the delete button
+      if (!e.target.matches('.delete-variable-btn')) {
+        variableBlock.classList.toggle('expanded');
+      }
+    });
+
+    // Setup delete button handler
+    deleteBtn.addEventListener('click', (e) => {
+      e.stopPropagation(); // Prevent header click
+      if (confirm('Are you sure you want to delete this variable?')) {
+        variableBlock.remove();
+        this.triggerSchemaUpdate();
+      }
     });
 
     const updateSummary = () => {
