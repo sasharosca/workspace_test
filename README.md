@@ -27,8 +27,12 @@ A web-based tool for building and visualizing conditional schemas with a dynamic
 ## Getting Started
 
 1. Clone this repository
-2. Open `index.html` in a modern web browser
-3. Start building your schema!
+2. Set up a local development server. You can use one of these methods:
+   - Python: Run `python -m http.server` in the project directory
+   - Node.js: Install `http-server` globally with `npm install -g http-server` and run `http-server`
+   - VS Code: Use the "Live Server" extension
+3. Open the provided local server URL in your browser (typically `http://localhost:8000` or `http://localhost:8080`)
+4. Start building your schema!
 
 ## How to Use
 
@@ -96,14 +100,6 @@ The generated schema follows this format:
   ]
 }
 ```
-
-## Browser Compatibility
-
-Tested and working in:
-- Chrome (latest)
-- Firefox (latest)
-- Safari (latest)
-- Edge (latest)
 
 ## Technical Details
 
