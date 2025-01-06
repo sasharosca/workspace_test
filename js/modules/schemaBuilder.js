@@ -48,7 +48,7 @@ export class SchemaBuilder {
     header.appendChild(summary);
     variableBlock.appendChild(header);
 
-    // Create content section
+    // Create content section (collapsed by default)
     const content = createElement('div', {className:'variable-content'});
     content.innerHTML = `
       <h3>Variable Details</h3>
@@ -114,27 +114,33 @@ export class SchemaBuilder {
       updateSummary();
     }
 
-    // Expand newly created variables by default
-    variableBlock.classList.add('expanded');
     return variableBlock;
   }
 
   populateVariableData(block, data) {
+    // Ensure the block starts collapsed
+    block.classList.remove('expanded');
+    
     const content = block.querySelector('.variable-content');
     content.querySelector('.var-name').value = data.name || '';
+    content.querySelector('.var-desc').value = data.description || '';
     content.querySelector('.var-type').value = data.type || 'enum';
-    if (data.description) content.querySelector('.var-desc').value = data.description;
-    
-    if (data.values && Array.isArray(data.values)) {
-      data.values.forEach(valObj => {
-        const valContainer = content.querySelector('.valuesContainer');
-        this.addValueUI(valContainer, valObj, data.type);
-      });
-    }
-    
+
+    // Populate values
+    const valuesContainer = content.querySelector('.valuesContainer');
+    (data.values || []).forEach(value => {
+      this.addValueUI(valuesContainer, value, data.type);
+    });
+
+    // Populate conditions
     if (data.conditions) {
-      this.populateConditions(content.querySelector('.conditionsContainer'), data.conditions);
+      const conditionsContainer = content.querySelector('.conditionsContainer');
+      this.populateConditions(conditionsContainer, data.conditions);
     }
+
+    // Update the summary display
+    const updateEvent = new Event('change');
+    content.querySelector('.var-name').dispatchEvent(updateEvent);
   }
 
   addValueUI(container, valueData=null, varType=null) {

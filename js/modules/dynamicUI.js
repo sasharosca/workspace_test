@@ -87,7 +87,14 @@ export class DynamicUI {
   }
 
   renderInfoVariable(block, variable) {
-    block.querySelectorAll('.info-field').forEach(n => n.remove());
+    // Clear all existing content including headers
+    block.querySelectorAll('.info-field, .variable-name-header').forEach(n => n.remove());
+    
+    // Add variable name header
+    const nameHeader = createElement('div', {
+      className: 'variable-name-header'
+    }, [variable.name]);
+    block.appendChild(nameHeader);
     
     if (variable.values && variable.values.length > 0) {
       variable.values.forEach(vObj => {
@@ -117,6 +124,42 @@ export class DynamicUI {
           const infoField = createElement('div', {
             className: 'info-field'
           }, [vObj.description]);
+
+          // Add selector information only if conditions exist AND the conditions aren't fully met yet
+          if (Object.keys(conditions).length > 0) {
+            const isFullyTriggered = Object.entries(conditions).every(([logic, condArray]) => {
+              if (logic === 'allOf') {
+                return condArray.every(cond => {
+                  const [varName, requiredValue] = Object.entries(cond)[0];
+                  return this.currentSelections[varName] === requiredValue;
+                });
+              } else if (logic === 'anyOf') {
+                return condArray.some(cond => {
+                  const [varName, requiredValue] = Object.entries(cond)[0];
+                  return this.currentSelections[varName] === requiredValue;
+                });
+              }
+              return false;
+            });
+
+            if (!isFullyTriggered) {
+              const selectorInfo = createElement('div', {
+                className: 'selector-info'
+              });
+              
+              Object.entries(conditions).forEach(([logic, condArray]) => {
+                const condText = condArray.map(cond => {
+                  const [varName, value] = Object.entries(cond)[0];
+                  return `${varName} = ${value}`;
+                }).join(logic === 'allOf' ? ' AND ' : ' OR ');
+                
+                selectorInfo.textContent = `Applies when: ${condText}`;
+              });
+              
+              infoField.appendChild(selectorInfo);
+            }
+          }
+          
           block.appendChild(infoField);
         }
       });

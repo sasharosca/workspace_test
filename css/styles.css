@@ -55,6 +55,18 @@ h3, h4 {
   border-bottom: 1px solid #e9ecef;
 }
 
+.variable-header::before {
+  content: '▶';
+  margin-right: 8px;
+  font-size: 12px;
+  color: #666;
+  transition: transform 0.2s;
+}
+
+.variable-entry.expanded .variable-header::before {
+  content: '▼';
+}
+
 .variable-header:hover {
   background: #f8f9fa;
 }
@@ -187,11 +199,34 @@ button.addValueBtn:hover, button.addConditionGroupBtn:hover, button.addCondition
 
 /* Dynamic UI specific styles */
 .variable-block {
-  background: #fff;
-  border: 1px solid #dee2e6;
-  border-radius: 6px;
+  margin-bottom: 20px;
   padding: 15px;
-  margin-bottom: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  background: white;
+}
+
+.variable-name-header {
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 10px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.info-field {
+  margin: 10px 0;
+  padding: 10px;
+  background: #f8f9fa;
+  border-radius: 4px;
+}
+
+.selector-info {
+  font-size: 0.9em;
+  color: #666;
+  margin-top: 5px;
+  padding-left: 10px;
+  border-left: 3px solid #e0e0e0;
 }
 
 .description {
