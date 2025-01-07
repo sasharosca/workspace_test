@@ -4,12 +4,24 @@ export class SchemaBuilder {
   constructor() {
     this.variablesContainer = document.getElementById('variablesContainer');
     this.addVarBtn = document.getElementById('addVariableBtn');
-    this.downloadSchemaBtn = document.getElementById('downloadSchemaBtn');
-    this.uploadSchemaBtn = document.getElementById('uploadSchemaBtn');
-    this.uploadInput = document.getElementById('uploadInput');
+    this.newSchemaBtn = document.getElementById('newSchemaBtn');
+    this.openSchemaBtn = document.getElementById('openSchemaBtn');
+    this.schemaFileInput = document.getElementById('schemaFileInput');
+    this.currentFileSpan = document.getElementById('currentFile');
     this.onSchemaChange = null;
     
+    this.currentFile = null;
+    this.currentFileHandle = null;
+    
     this.setupEventListeners();
+  }
+
+  showAddVariableButton() {
+    this.addVarBtn.style.display = 'block';
+  }
+
+  hideAddVariableButton() {
+    this.addVarBtn.style.display = 'none';
   }
 
   setupEventListeners() {
@@ -17,9 +29,10 @@ export class SchemaBuilder {
       this.addVariableUI(this.variablesContainer);
       this.triggerSchemaUpdate();
     });
-    this.downloadSchemaBtn.addEventListener('click', () => this.downloadSchema());
-    this.uploadSchemaBtn.addEventListener('click', () => this.uploadInput.click());
-    this.uploadInput.addEventListener('change', () => this.handleUpload());
+
+    this.newSchemaBtn.addEventListener('click', () => this.createNewSchema());
+    this.openSchemaBtn.addEventListener('click', () => this.openSchemaFile());
+    this.schemaFileInput.addEventListener('change', () => this.handleFileSelect());
 
     // Listen for changes in the variables container
     this.variablesContainer.addEventListener('change', () => {
@@ -27,10 +40,75 @@ export class SchemaBuilder {
     });
   }
 
+  async createNewSchema() {
+    try {
+      const handle = await window.showSaveFilePicker({
+        types: [{
+          description: 'JSON Files',
+          accept: {'application/json': ['.json']},
+        }],
+      });
+      
+      this.currentFileHandle = handle;
+      this.currentFile = handle.name;
+      this.currentFileSpan.textContent = `Current file: ${this.currentFile}`;
+      
+      // Clear existing schema
+      this.variablesContainer.innerHTML = '';
+      this.showAddVariableButton();
+      this.triggerSchemaUpdate();
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        console.error('Error creating new schema:', err);
+      }
+    }
+  }
+
+  async openSchemaFile() {
+    try {
+      const [handle] = await window.showOpenFilePicker({
+        types: [{
+          description: 'JSON Files',
+          accept: {'application/json': ['.json']},
+        }],
+      });
+      
+      this.currentFileHandle = handle;
+      this.currentFile = handle.name;
+      this.currentFileSpan.textContent = `Current file: ${this.currentFile}`;
+      
+      const file = await handle.getFile();
+      const content = await file.text();
+      this.loadSchemaIntoBuilder(JSON.parse(content));
+      this.showAddVariableButton();
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        console.error('Error opening schema file:', err);
+      }
+    }
+  }
+
+  async saveCurrentSchema() {
+    if (!this.currentFileHandle) return;
+
+    try {
+      const schema = this.buildSchema();
+      const writable = await this.currentFileHandle.createWritable();
+      await writable.write(JSON.stringify(schema, null, 2));
+      await writable.close();
+    } catch (err) {
+      console.error('Error saving schema:', err);
+    }
+  }
+
   triggerSchemaUpdate() {
     if (this.onSchemaChange) {
       const schema = this.buildSchema();
       this.onSchemaChange(schema);
+    }
+    // Autosave when schema changes
+    if (this.currentFileHandle) {
+      this.saveCurrentSchema();
     }
   }
 
@@ -135,32 +213,6 @@ export class SchemaBuilder {
     }
 
     return variableBlock;
-  }
-
-  populateVariableData(block, data) {
-    // Ensure the block starts collapsed
-    block.classList.remove('expanded');
-    
-    const content = block.querySelector('.variable-content');
-    content.querySelector('.var-name').value = data.name || '';
-    content.querySelector('.var-desc').value = data.description || '';
-    content.querySelector('.var-type').value = data.type || 'enum';
-
-    // Populate values
-    const valuesContainer = content.querySelector('.valuesContainer');
-    (data.values || []).forEach(value => {
-      this.addValueUI(valuesContainer, value, data.type);
-    });
-
-    // Populate conditions
-    if (data.conditions) {
-      const conditionsContainer = content.querySelector('.conditionsContainer');
-      this.populateConditions(conditionsContainer, data.conditions);
-    }
-
-    // Update the summary display
-    const updateEvent = new Event('change');
-    content.querySelector('.var-name').dispatchEvent(updateEvent);
   }
 
   addValueUI(container, valueData=null, varType=null) {
@@ -357,36 +409,6 @@ export class SchemaBuilder {
     return {[logic]: groupArray};
   }
 
-  async downloadSchema() {
-    const schema = this.buildSchema();
-    const schemaText = JSON.stringify(schema, null, 2);
-    const blob = new Blob([schemaText], {type: 'application/json'});
-    const url = URL.createObjectURL(blob);
-    const a = createElement('a', {href: url, download: 'schema.json'});
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }
-
-  async handleUpload() {
-    const file = this.uploadInput.files[0];
-    if (!file) return;
-    
-    try {
-      const text = await file.text();
-      const json = JSON.parse(text.trim());
-      if (!json || typeof json !== 'object') {
-        throw new Error('Invalid schema format');
-      }
-      this.loadSchemaIntoBuilder(json);
-      this.triggerSchemaUpdate();
-    } catch(e) {
-      console.error('Schema parsing error:', e);
-      alert('Invalid JSON file: ' + e.message);
-    }
-  }
-
   loadSchemaIntoBuilder(json) {
     this.variablesContainer.innerHTML = '';
 
@@ -394,6 +416,33 @@ export class SchemaBuilder {
     json.variables.forEach(v => {
       this.addVariableUI(this.variablesContainer, v);
     });
+    this.triggerSchemaUpdate();
+  }
+
+  populateVariableData(block, data) {
+    // Ensure the block starts collapsed
+    block.classList.remove('expanded');
+    
+    const content = block.querySelector('.variable-content');
+    content.querySelector('.var-name').value = data.name || '';
+    content.querySelector('.var-desc').value = data.description || '';
+    content.querySelector('.var-type').value = data.type || 'enum';
+
+    // Populate values
+    const valuesContainer = content.querySelector('.valuesContainer');
+    (data.values || []).forEach(value => {
+      this.addValueUI(valuesContainer, value, data.type);
+    });
+
+    // Populate conditions
+    if (data.conditions) {
+      const conditionsContainer = content.querySelector('.conditionsContainer');
+      this.populateConditions(conditionsContainer, data.conditions);
+    }
+
+    // Update the summary display
+    const updateEvent = new Event('change');
+    content.querySelector('.var-name').dispatchEvent(updateEvent);
   }
 
   populateConditions(container, conditionsData) {

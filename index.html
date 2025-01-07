@@ -11,15 +11,15 @@
 
 <div id="schemaBuilder">
   <h2>Build Your Schema</h2>
-  <div>
-    <button id="uploadSchemaBtn">Upload Schema</button>
-    <input type="file" id="uploadInput" accept=".json" style="display:none;"/>
+  <div style="margin-bottom: 20px;">
+    <button id="newSchemaBtn">New Schema</button>
+    <button id="openSchemaBtn">Open Schema File</button>
+    <input type="file" id="schemaFileInput" accept=".json" style="display:none;"/>
+    <span id="currentFile" style="margin-left: 10px; font-style: italic;"></span>
   </div>
-  <div id="variablesContainer"></div>
-  <button id="addVariableBtn">Add Variable</button>
+  <div id="variablesContainer" style="margin-top: 10px;"></div>
+  <button id="addVariableBtn" style="display: none;">Add Variable</button>
   
-  <h3>Actions</h3>
-  <button id="downloadSchemaBtn">Download Schema</button>
 </div>
 
 <div id="dynamicUI">
