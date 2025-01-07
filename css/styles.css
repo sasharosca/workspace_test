@@ -2,37 +2,36 @@
 body {
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
   margin: 0;
-  padding: 20px;
+  padding: 12px;
   background-color: #f5f5f7;
   color: #333;
-  line-height: 1.5;
+  line-height: 1.4;
+  max-width: 800px;
+  margin: 0 auto;
 }
 
 h1 {
   color: #1a1a1a;
   text-align: center;
-  margin-bottom: 30px;
-  padding-bottom: 15px;
-  border-bottom: 2px solid #e0e0e0;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e0e0e0;
+  font-size: 1.5em;
 }
 
 h2 {
+  display: inline-block;
   color: #2c3e50;
-  margin-top: 25px;
-  margin-bottom: 15px;
-}
-
-h3, h4 {
-  color: #34495e;
-  margin: 15px 0 10px;
+  margin: 12px 15px 8px 0;
+  font-size: 1.2em;
 }
 
 /* Main sections */
 #schemaBuilder, #dynamicUI {
   background: white;
-  border-radius: 8px;
-  padding: 20px;
-  margin-bottom: 25px;
+  border-radius: 6px;
+  padding: 15px;
+  margin-bottom: 20px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
@@ -40,48 +39,85 @@ h3, h4 {
 .variable-entry {
   background: #f8f9fa;
   border: 1px solid #e9ecef;
-  border-radius: 6px;
+  border-radius: 4px;
   padding: 0;
   margin-bottom: 8px;
-  transition: all 0.3s ease;
+  position: relative;
+}
+
+.drag-handle {
+  cursor: move;
+  padding: 8px;
+  color: #6c757d;
+  display: flex;
+  align-items: center;
+  touch-action: none;
+}
+
+.drag-handle::before {
+  content: '⋮⋮';
+  font-size: 14px;
+  line-height: 1;
+}
+
+.variable-entry.dragging {
+  opacity: 0.5;
+  border: 2px dashed #007bff;
+  pointer-events: none;
+}
+
+.drop-placeholder {
+  height: 3px;
+  background-color: #007bff;
+  margin: 0;
+  position: absolute;
+  left: 0;
+  right: 0;
+  transition: transform 0.2s ease;
+}
+
+.drop-placeholder.top {
+  top: -4px;
+}
+
+.drop-placeholder.bottom {
+  bottom: -4px;
 }
 
 .variable-header {
   display: flex;
   align-items: center;
-  padding: 12px 15px;
+  padding: 0;
   cursor: pointer;
   background: #fff;
   border-bottom: 1px solid #e9ecef;
 }
 
-.variable-header::before {
-  content: '▶';
-  margin-right: 8px;
-  font-size: 12px;
+.variable-header .expand-icon {
+  margin-right: 6px;
+  font-size: 10px;
   color: #666;
   transition: transform 0.2s;
+  padding: 8px;
 }
 
-.variable-entry.expanded .variable-header::before {
-  content: '▼';
-}
-
-.variable-header:hover {
-  background: #f8f9fa;
+.variable-entry.expanded .expand-icon {
+  transform: rotate(90deg);
 }
 
 .variable-summary {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 10px;
+  padding: 8px 0;
 }
 
 .variable-name-display {
   font-weight: 600;
   color: #2c3e50;
   min-width: 120px;
+  font-size: 0.95em;
 }
 
 .variable-type-display {
@@ -98,112 +134,139 @@ h3, h4 {
 }
 
 .variable-content {
-  padding: 15px;
+  padding: 12px;
   display: none;
 }
 
-.variable-entry.expanded .variable-content {
-  display: block;
+/* Form elements */
+.form-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
-.variable-entry.expanded {
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+.form-row input[type="text"] {
+  flex: 1;
+  max-width: 400px;
 }
 
-/* Improve nested components */
-.condition-group, .condition-entry, .value-entry {
-  margin-left: 15px;
-  margin-right: 15px;
+.form-row select {
+  width: auto;
+  min-width: 100px;
 }
 
+input[type="text"], select {
+  padding: 6px 10px;
+  margin: 0;
+  font-size: 0.9em;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  height: 32px;
+}
+
+input[type="text"] {
+  width: 100%;
+  max-width: 400px;
+}
+
+select {
+  width: auto;
+  min-width: 100px;
+  max-width: 200px;
+  padding-right: 24px;
+}
+
+/* Buttons */
+.button-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9em;
+  height: 32px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Nested components */
 .condition-group {
   background: #fff;
   border: 1px solid #dee2e6;
   border-radius: 4px;
-  padding: 12px;
-  margin: 10px 0;
+  padding: 8px;
+  margin: 8px 0;
+}
+
+.condition-group select {
+  margin-bottom: 8px;
 }
 
 .condition-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   background: #f8f9fa;
   border: 1px solid #e9ecef;
   border-radius: 4px;
-  padding: 10px;
+  padding: 8px;
   margin: 8px 0;
+  flex-wrap: wrap;
+}
+
+.condition-entry select {
+  flex: 1;
+  max-width: 200px;
 }
 
 .value-entry {
   background: #fff;
   border: 1px solid #e9ecef;
   border-radius: 4px;
-  padding: 12px;
-  margin: 10px 0;
+  padding: 8px;
+  margin: 8px 0;
+  max-width: 600px;
 }
 
-/* Form elements */
-label {
-  display: inline-block;
-  width: 200px;
-  margin-right: 10px;
-  color: #495057;
-  font-weight: 500;
-}
-
-input[type="text"], select {
-  padding: 8px 12px;
-  border: 1px solid #ced4da;
-  border-radius: 4px;
+.value-entry input[type="text"] {
   margin-bottom: 8px;
-  width: 250px;
-  font-size: 14px;
 }
 
-input[type="text"]:focus, select:focus {
-  outline: none;
-  border-color: #80bdff;
-  box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+.valueConditionsContainer,
+.conditionsContainer,
+.conditionEntriesContainer {
+  margin: 8px 0;
 }
 
-/* Buttons */
-button {
-  background-color: #007bff;
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: background-color 0.2s;
-}
-
-button:hover {
-  background-color: #0056b3;
-}
-
-button.addValueBtn, button.addConditionGroupBtn, button.addConditionEntryBtn {
+/* Action buttons */
+button.addValueBtn,
+button.addConditionGroupBtn,
+button.addConditionEntryBtn,
+button.addValueConditionGroupBtn {
   background-color: #6c757d;
   margin-top: 8px;
+  font-size: 0.9em;
+  height: 32px;
 }
 
-button.addValueBtn:hover, button.addConditionGroupBtn:hover, button.addConditionEntryBtn:hover {
-  background-color: #5a6268;
-}
-
-#downloadSchemaBtn {
-  background-color: #17a2b8;
-}
-
-#downloadSchemaBtn:hover {
-  background-color: #138496;
-}
-
-/* Dynamic UI specific styles */
+/* Dynamic UI */
 .variable-block {
-  margin-bottom: 20px;
-  padding: 15px;
+  background: white;
   border: 1px solid #e0e0e0;
   border-radius: 6px;
-  background: white;
+  padding: 15px;
+  margin-bottom: 15px;
+  max-width: 700px;
 }
 
 .variable-name-header {
@@ -212,36 +275,17 @@ button.addValueBtn:hover, button.addConditionGroupBtn:hover, button.addCondition
   margin-bottom: 10px;
   padding-bottom: 5px;
   border-bottom: 1px solid #e0e0e0;
-}
-
-.info-field {
-  margin: 10px 0;
-  padding: 10px;
-  background: #f8f9fa;
-  border-radius: 4px;
-}
-
-.selector-info {
-  font-size: 0.9em;
-  color: #666;
-  margin-top: 5px;
-  padding-left: 10px;
-  border-left: 3px solid #e0e0e0;
-}
-
-.description {
-  color: #6c757d;
-  font-style: italic;
-  margin-bottom: 10px;
+  font-size: 1.1em;
 }
 
 .info-field {
   background: #e3f2fd;
   border-left: 4px solid #1976d2;
   color: #1976d2;
-  padding: 10px;
   border-radius: 4px;
-  margin-top: 8px;
+  margin: 8px 0;
+  padding: 10px;
+  font-size: 0.95em;
 }
 
 .info-field.active {
@@ -257,6 +301,23 @@ button.addValueBtn:hover, button.addConditionGroupBtn:hover, button.addCondition
   opacity: 0.8;
 }
 
+.selector-info {
+  display: inline-block;
+  font-size: 0.9em;
+  color: #666;
+  border-left: 3px solid #e0e0e0;
+  margin: 6px 0 0 0;
+  padding-left: 10px;
+}
+
+.description {
+  display: inline-block;
+  color: #6c757d;
+  font-style: italic;
+  margin: 0 8px;
+  font-size: 0.95em;
+}
+
 .delete-variable-btn {
   background: none;
   border: none;
@@ -266,10 +327,43 @@ button.addValueBtn:hover, button.addConditionGroupBtn:hover, button.addCondition
   cursor: pointer;
   margin-left: auto;
   opacity: 0.6;
-  transition: opacity 0.2s;
+  line-height: 1;
 }
 
 .delete-variable-btn:hover {
   opacity: 1;
   background: none;
+}
+
+.variable-entry.expanded .variable-content {
+  display: block;
+}
+
+.variable-entry.expanded {
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+input[type="text"]:focus, select:focus {
+  outline: none;
+  border-color: #80bdff;
+  box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+}
+
+button:hover {
+  background-color: #0056b3;
+}
+
+button.addValueBtn:hover,
+button.addConditionGroupBtn:hover,
+button.addConditionEntryBtn:hover,
+button.addValueConditionGroupBtn:hover {
+  background-color: #5a6268;
+}
+
+#downloadSchemaBtn {
+  background-color: #17a2b8;
+}
+
+#downloadSchemaBtn:hover {
+  background-color: #138496;
 } 

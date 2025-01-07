@@ -9,11 +9,140 @@ export class SchemaBuilder {
     this.schemaFileInput = document.getElementById('schemaFileInput');
     this.currentFileSpan = document.getElementById('currentFile');
     this.onSchemaChange = null;
+    this.draggedElement = null;
+    this.dropPlaceholder = null;
+    this.lastDropTarget = null;
+    this.lastDropPosition = null;
     
     this.currentFile = null;
     this.currentFileHandle = null;
     
     this.setupEventListeners();
+    this.setupDragAndDrop();
+  }
+
+  setupDragAndDrop() {
+    // Create placeholder element
+    this.dropPlaceholder = document.createElement('div');
+    this.dropPlaceholder.className = 'drop-placeholder';
+    
+    // Enable drag and drop on the container
+    this.variablesContainer.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      
+      if (!this.draggedElement) return;
+      
+      const { element: targetElement, insertBefore } = this.getDropTarget(e.clientY);
+      if (!targetElement || targetElement === this.draggedElement) {
+        this.clearDropIndicator();
+        return;
+      }
+      
+      // Only update if position changed
+      if (targetElement !== this.lastDropTarget || insertBefore !== this.lastDropPosition) {
+        this.updateDropIndicator(targetElement, insertBefore ? 'top' : 'bottom');
+        this.lastDropTarget = targetElement;
+        this.lastDropPosition = insertBefore;
+      }
+    });
+
+    this.variablesContainer.addEventListener('dragleave', (e) => {
+      // Only clear if we're leaving the container
+      if (!this.variablesContainer.contains(e.relatedTarget)) {
+        this.clearDropIndicator();
+      }
+    });
+
+    this.variablesContainer.addEventListener('drop', (e) => {
+      e.preventDefault();
+      if (!this.draggedElement || !this.lastDropTarget) return;
+      
+      const insertBefore = this.lastDropPosition;
+      if (insertBefore) {
+        this.lastDropTarget.parentNode.insertBefore(this.draggedElement, this.lastDropTarget);
+      } else {
+        this.lastDropTarget.parentNode.insertBefore(this.draggedElement, this.lastDropTarget.nextSibling);
+      }
+      
+      this.clearDropIndicator();
+      this.triggerSchemaUpdate();
+    });
+  }
+
+  getDropTarget(clientY) {
+    const children = Array.from(this.variablesContainer.children).filter(child => 
+      child !== this.draggedElement && child !== this.dropPlaceholder
+    );
+    
+    if (!children.length) return { element: null, insertBefore: false };
+
+    // Special case: above first element
+    const firstChild = children[0];
+    const firstRect = firstChild.getBoundingClientRect();
+    if (clientY < firstRect.top + 10) {
+      return { element: firstChild, insertBefore: true };
+    }
+
+    // Special case: below last element
+    const lastChild = children[children.length - 1];
+    const lastRect = lastChild.getBoundingClientRect();
+    if (clientY >= lastRect.bottom - 10) {
+      return { element: lastChild, insertBefore: false };
+    }
+
+    // Check each pair of elements for a drop position
+    for (let i = 0; i < children.length; i++) {
+      const currentElement = children[i];
+      const currentRect = currentElement.getBoundingClientRect();
+      
+      // If this is the last element
+      if (i === children.length - 1) {
+        return { element: currentElement, insertBefore: false };
+      }
+      
+      const nextElement = children[i + 1];
+      const nextRect = nextElement.getBoundingClientRect();
+      
+      // Calculate the gap region
+      const gapTop = currentRect.bottom;
+      const gapBottom = nextRect.top;
+      const gapMiddle = (gapTop + gapBottom) / 2;
+      
+      // If we're in the gap
+      if (clientY >= gapTop && clientY <= gapBottom) {
+        return {
+          element: clientY <= gapMiddle ? currentElement : nextElement,
+          insertBefore: clientY > gapMiddle
+        };
+      }
+      
+      // If we're over the current element
+      if (clientY >= currentRect.top && clientY < gapTop) {
+        const elementMiddle = (currentRect.top + currentRect.bottom) / 2;
+        return {
+          element: currentElement,
+          insertBefore: clientY <= elementMiddle
+        };
+      }
+    }
+    
+    // Fallback
+    return { element: lastChild, insertBefore: false };
+  }
+
+  updateDropIndicator(target, position) {
+    this.clearDropIndicator();
+    this.dropPlaceholder.className = `drop-placeholder ${position}`;
+    target.appendChild(this.dropPlaceholder);
+  }
+
+  clearDropIndicator() {
+    if (this.dropPlaceholder.parentNode) {
+      this.dropPlaceholder.remove();
+    }
+    this.lastDropTarget = null;
+    this.lastDropPosition = null;
   }
 
   showAddVariableButton() {
@@ -117,6 +246,16 @@ export class SchemaBuilder {
     
     // Create header for collapsible section
     const header = createElement('div', {className:'variable-header'});
+    
+    // Add drag handle
+    const dragHandle = createElement('div', {className:'drag-handle'});
+    dragHandle.draggable = true;
+    
+    // Add expand/collapse icon
+    const expandIcon = createElement('span', {className:'expand-icon'}, ['▶']);
+    header.appendChild(dragHandle);
+    header.appendChild(expandIcon);
+    
     const summary = createElement('div', {className:'variable-summary'});
     summary.innerHTML = `
       <span class="variable-name-display">New Variable</span>
@@ -134,25 +273,36 @@ export class SchemaBuilder {
     
     variableBlock.appendChild(header);
 
+    // Setup drag events
+    dragHandle.addEventListener('dragstart', (e) => {
+      e.stopPropagation();
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', '');
+      requestAnimationFrame(() => {
+        this.draggedElement = variableBlock;
+        variableBlock.classList.add('dragging');
+      });
+    });
+    
+    dragHandle.addEventListener('dragend', (e) => {
+      e.stopPropagation();
+      this.draggedElement = null;
+      variableBlock.classList.remove('dragging');
+      this.clearDropIndicator();
+    });
+
     // Create content section (collapsed by default)
     const content = createElement('div', {className:'variable-content'});
     content.innerHTML = `
-      <h3>Variable Details</h3>
-      <label>Variable Name:</label><input type="text" class="var-name" placeholder="e.g. Level"><br/>
-      <label>Type:</label>
-      <select class="var-type">
-        <option value="enum">Enum</option>
-        <option value="info">Info</option>
-      </select><br/>
-      <label>Description:</label><input type="text" class="var-desc" placeholder="Description (optional)"><br/>
-      <h4>Values</h4>
-      <p>For "enum" variables, each value is a "Value Name" for the dropdown.<br>
-      For "info" variables, each value is a "Value Description" displayed conditionally.<br>
-      Conditions can be added to each value.</p>
+      <div class="form-row">
+        <input type="text" class="var-name" placeholder="Variable Name (e.g. Level)">
+        <select class="var-type">
+          <option value="enum">Enum</option>
+          <option value="info">Info</option>
+        </select>
+      </div>
       <div class="valuesContainer"></div>
       <button type="button" class="addValueBtn">Add Value</button>
-
-      <h4>Conditions (optional)</h4>
       <div class="conditionsContainer"></div>
       <button type="button" class="addConditionGroupBtn">Add Condition Group</button>
     `;
@@ -161,8 +311,8 @@ export class SchemaBuilder {
 
     // Setup event listeners
     header.addEventListener('click', (e) => {
-      // Don't toggle if clicking the delete button
-      if (!e.target.matches('.delete-variable-btn')) {
+      // Don't toggle if clicking the delete button or drag handle
+      if (!e.target.matches('.delete-variable-btn') && !e.target.closest('.drag-handle')) {
         variableBlock.classList.toggle('expanded');
       }
     });
@@ -218,8 +368,7 @@ export class SchemaBuilder {
   addValueUI(container, valueData=null, varType=null) {
     const valEntry = createElement('div', {className:'value-entry'});
     valEntry.innerHTML = `
-      <label>Value Name/Description:</label><input type="text" class="value-name" placeholder="Enum: Value Name, Info: Value Description"><br/>
-      <h4>Value Conditions (optional)</h4>
+      <input type="text" class="value-name" placeholder="Value Name/Description">
       <div class="valueConditionsContainer"></div>
       <button type="button" class="addValueConditionGroupBtn">Add Condition Group</button>
     `;
@@ -242,10 +391,9 @@ export class SchemaBuilder {
   addConditionGroupUI(container, groupData=null) {
     const group = createElement('div', {className:'condition-group'});
     group.innerHTML = `
-      <label>Group Logic:</label>
       <select class="group-logic">
-        <option value="allOf">allOf (AND)</option>
-        <option value="anyOf">anyOf (OR)</option>
+        <option value="allOf">AND</option>
+        <option value="anyOf">OR</option>
       </select>
       <div class="conditionEntriesContainer"></div>
       <button type="button" class="addConditionEntryBtn">Add Condition</button>
@@ -340,10 +488,8 @@ export class SchemaBuilder {
   buildVariableObject(block) {
     const varName = block.querySelector('.var-name').value.trim();
     const varType = block.querySelector('.var-type').value;
-    const varDesc = block.querySelector('.var-desc').value.trim();
     
     let varObj = {name: varName, type: varType};
-    if (varDesc) varObj.description = varDesc;
 
     const values = this.buildValues(block, varType);
     if (values.length > 0) varObj.values = values;
@@ -425,7 +571,6 @@ export class SchemaBuilder {
     
     const content = block.querySelector('.variable-content');
     content.querySelector('.var-name').value = data.name || '';
-    content.querySelector('.var-desc').value = data.description || '';
     content.querySelector('.var-type').value = data.type || 'enum';
 
     // Populate values
