@@ -1,4 +1,4 @@
-import { createElement, evaluateConditions } from './utils.js';
+import { createElement, evaluateConditions, getValueRelationships } from './utils.js';
 
 export class DynamicUI {
   constructor(schemaBuilder) {
@@ -6,165 +6,100 @@ export class DynamicUI {
     this.formContainer = document.getElementById('formContainer');
     this.currentSelections = {};
     this.currentSchema = null;
+    
+    // Add CSS for value states
+    const style = document.createElement('style');
+    style.textContent = `
+      .value-block { 
+        opacity: 1; 
+        transition: all 0.2s;
+      }
+      .value-block.related { 
+        background-color: rgba(0, 123, 255, 0.1);
+        border-color: #007bff;
+      }
+      .value-block.incompatible { 
+        opacity: 0.4;
+      }
+      .value-block:hover { 
+        opacity: 1;
+        background-color: rgba(0, 123, 255, 0.05);
+      }
+    `;
+    document.head.appendChild(style);
   }
 
   renderSchema(schema) {
     this.currentSchema = schema;
     this.currentSelections = {};
     this.formContainer.innerHTML = '';
-    (schema.variables || []).forEach(v => this.renderVariable(this.formContainer, v));
-    this.updateVisibleFields();
+    (schema.variables || []).forEach(v => {
+      const block = createElement('div', {className: 'variable-block'});
+      block.appendChild(createElement('div', {className: 'variable-name-header'}, [v.name]));
+      const valuesContainer = createElement('div', {className: 'values-container'});
+      block.appendChild(valuesContainer);
+      this.formContainer.appendChild(block);
+    });
+    this.updateFields();
   }
 
-  renderVariable(parent, variable) {
-    const block = createElement('div', {className: 'variable-block'});
-    if (variable.description) {
-      block.appendChild(createElement('div', {className: 'description'}, [variable.description]));
-    }
+  updateFields() {
+    if (!this.currentSchema?.variables) return;
 
-    if (variable.type === 'enum') {
-      const label = createElement('label', {}, [variable.name + ": "]);
-      const select = createElement('select', {dataset: {varName: variable.name}});
-      block.appendChild(label);
-      block.appendChild(select);
-    } else {
-      block.dataset.varName = variable.name;
-      block.dataset.infoField = 'true';
-      block.dataset.variable = JSON.stringify(variable);
-    }
-    parent.appendChild(block);
-  }
+    // Get relationships based on current selections
+    const relationships = getValueRelationships(this.currentSchema, this.currentSelections);
 
-  updateVisibleFields() {
-    if (!this.currentSchema) return;
-    this.applyConditionsToUI(this.currentSchema.variables, this.formContainer);
-  }
-
-  applyConditionsToUI(variables, container) {
-    let children = Array.from(container.children);
-    variables.forEach((variable, i) => {
-      const block = children[i];
-      const visible = evaluateConditions(variable.conditions || {}, this.currentSelections);
-      block.style.display = visible ? 'block' : 'none';
-      if (visible) {
-        if (variable.type === 'enum') {
-          this.renderEnumVariableValues(block, variable);
-        } else {
-          this.renderInfoVariable(block, variable);
-        }
-      }
+    Array.from(this.formContainer.children).forEach((block, i) => {
+      const variable = this.currentSchema.variables[i];
+      this.renderVariableValues(block, variable, relationships);
     });
   }
 
-  renderEnumVariableValues(block, variable) {
-    let select = block.querySelector('select');
-    const newSelect = select.cloneNode(false);
-    newSelect.appendChild(new Option('---Select---', ''));
+  renderVariableValues(block, variable, relationships) {
+    const valuesContainer = block.querySelector('.values-container');
+    valuesContainer.innerHTML = '';
+    
+    if (!this.currentSelections[variable.name]) {
+      this.currentSelections[variable.name] = [];
+    }
 
-    let currentSelectedValue = this.currentSelections[variable.name] || '';
-    let foundSelection = false;
+    const { related, incompatible } = relationships[variable.name];
+    const hasSelections = Object.values(this.currentSelections).some(vals => vals.length > 0);
 
     (variable.values || []).forEach(vObj => {
-      if (evaluateConditions((vObj.conditions || {}), this.currentSelections)) {
-        const opt = new Option(vObj.name, vObj.name);
-        newSelect.appendChild(opt);
-        if (vObj.name === currentSelectedValue) foundSelection = true;
-      }
-    });
-
-    if (!foundSelection) {
-      this.currentSelections[variable.name] = '';
-      currentSelectedValue = '';
-    }
-
-    newSelect.value = currentSelectedValue;
-    newSelect.addEventListener('change', () => {
-      this.currentSelections[variable.name] = newSelect.value;
-      this.updateVisibleFields();
-    });
-
-    select.replaceWith(newSelect);
-  }
-
-  renderInfoVariable(block, variable) {
-    // Clear all existing content including headers
-    block.querySelectorAll('.info-field, .variable-name-header').forEach(n => n.remove());
-    
-    // Add variable name header
-    const nameHeader = createElement('div', {
-      className: 'variable-name-header'
-    }, [variable.name]);
-    block.appendChild(nameHeader);
-    
-    if (variable.values && variable.values.length > 0) {
-      variable.values.forEach(vObj => {
-        const conditions = vObj.conditions || {};
-        
-        // Check if any condition group explicitly disqualifies this value
-        const isDisqualified = Object.entries(conditions).some(([logic, condArray]) => {
-          if (logic === 'allOf') {
-            // For AND logic, if any condition conflicts with current selection, it's disqualified
-            return condArray.some(cond => {
-              const [varName, requiredValue] = Object.entries(cond)[0];
-              const currentValue = this.currentSelections[varName];
-              return currentValue && currentValue !== requiredValue;
-            });
-          } else if (logic === 'anyOf') {
-            // For OR logic, if all conditions conflict with current selections, it's disqualified
-            return condArray.length > 0 && condArray.every(cond => {
-              const [varName, requiredValue] = Object.entries(cond)[0];
-              const currentValue = this.currentSelections[varName];
-              return currentValue && currentValue !== requiredValue;
-            });
-          }
-          return false;
-        });
-
-        if (!isDisqualified) {
-          const infoField = createElement('div', {
-            className: 'info-field'
-          }, [vObj.description]);
-
-          // Add selector information only if conditions exist AND the conditions aren't fully met yet
-          if (Object.keys(conditions).length > 0) {
-            const isFullyTriggered = Object.entries(conditions).every(([logic, condArray]) => {
-              if (logic === 'allOf') {
-                return condArray.every(cond => {
-                  const [varName, requiredValue] = Object.entries(cond)[0];
-                  return this.currentSelections[varName] === requiredValue;
-                });
-              } else if (logic === 'anyOf') {
-                return condArray.some(cond => {
-                  const [varName, requiredValue] = Object.entries(cond)[0];
-                  return this.currentSelections[varName] === requiredValue;
-                });
-              }
-              return false;
-            });
-
-            if (!isFullyTriggered) {
-              const selectorInfo = createElement('div', {
-                className: 'selector-info'
-              });
-              
-              Object.entries(conditions).forEach(([logic, condArray]) => {
-                const condText = condArray.map(cond => {
-                  const [varName, value] = Object.entries(cond)[0];
-                  return `${varName} = ${value}`;
-                }).join(logic === 'allOf' ? ' AND ' : ' OR ');
-                
-                selectorInfo.textContent = `Applies when: ${condText}`;
-              });
-              
-              infoField.appendChild(selectorInfo);
-            }
-          }
-          
-          block.appendChild(infoField);
-        }
+      let className = 'value-block';
+      if (related.has(vObj.name)) className += ' related';
+      if (incompatible.has(vObj.name)) className += ' incompatible';
+      
+      const valueBlock = createElement('div', { className });
+      const checkbox = createElement('input', {
+        type: 'checkbox',
+        id: `${variable.name}-${vObj.name}`,
+        checked: this.currentSelections[variable.name].includes(vObj.name)
       });
-    } else if (variable.description) {
-      block.appendChild(createElement('div', {className: 'info-field'}, [variable.description]));
-    }
+      const label = createElement('label', {
+        htmlFor: `${variable.name}-${vObj.name}`,
+        className: 'value-label'
+      }, [vObj.name]);
+      
+      checkbox.addEventListener('change', () => {
+        const selections = this.currentSelections[variable.name];
+        if (checkbox.checked) {
+          if (!selections.includes(vObj.name)) {
+            selections.push(vObj.name);
+          }
+        } else {
+          const index = selections.indexOf(vObj.name);
+          if (index > -1) {
+            selections.splice(index, 1);
+          }
+        }
+        this.updateFields();
+      });
+
+      valueBlock.appendChild(checkbox);
+      valueBlock.appendChild(label);
+      valuesContainer.appendChild(valueBlock);
+    });
   }
-} 
+}

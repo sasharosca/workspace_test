@@ -1,28 +1,32 @@
 # Schema Builder with Dynamic UI
 
-A web-based tool for building and visualizing conditional schemas with a dynamic, interactive UI. This tool allows you to create complex, nested schemas with conditional logic and see the results in real-time.
+A web-based tool for exploring and visualizing relationships in conditional schemas. This tool helps you understand how different variables and values are interconnected through an intuitive, interactive interface.
 
 ## Features
 
+- **Relationship Visualization**
+  - Interactive exploration of variable relationships
+  - Visual highlighting of related values
+  - Clear indication of incompatible selections
+  - Intuitive interface for understanding connections
+
 - **Schema Builder**
-  - Create variables with different types (enum, info)
-  - Add conditional logic to variables and values
-  - Support for AND/OR conditions
+  - Create variables and their possible values
+  - Define relationships between variables using conditions
+  - Support for AND/OR logic
   - Real-time schema generation
   - Upload existing schemas
   - Download generated schemas as JSON
 
 - **Dynamic UI**
-  - Real-time preview of the schema
-  - Interactive form elements based on schema
-  - Conditional rendering based on selections
-  - Live updates as you make choices
-
-- **Modern Interface**
-  - Clean, intuitive design
-  - Responsive layout
-  - Visual separation between components
-  - Clear hierarchy of information
+  - Visual feedback for relationships:
+    - Related values are highlighted with a light blue background
+    - Incompatible values are dimmed
+    - Unrelated values remain clearly visible
+    - Hover effects reveal potential relationships
+  - Smooth transitions between states
+  - Interactive checkboxes for selection
+  - Bidirectional relationship display
 
 ## Getting Started
 
@@ -32,7 +36,7 @@ A web-based tool for building and visualizing conditional schemas with a dynamic
    - Node.js: Install `http-server` globally with `npm install -g http-server` and run `http-server`
    - VS Code: Use the "Live Server" extension
 3. Open the provided local server URL in your browser (typically `http://localhost:8000` or `http://localhost:8080`)
-4. Start building your schema!
+4. Start exploring relationships in your schema!
 
 ## How to Use
 
@@ -41,20 +45,37 @@ A web-based tool for building and visualizing conditional schemas with a dynamic
 1. Click "Add Variable" to create a new variable
 2. Fill in the variable details:
    - Name: The identifier for your variable
-   - Type: Choose between:
-     - `enum`: For dropdown selections
-     - `info`: For informational text
    - Description: Optional explanation of the variable
 
 3. Add values to your variable:
-   - For `enum` types: These become dropdown options
-   - For `info` types: These become conditional text blocks
-   - Each value can have its own conditions
+   - Values become selectable options
+   - Each value can have relationships with other values
 
-4. Add conditions (optional):
-   - Click "Add Condition Group" to create a condition
+4. Define relationships (optional):
+   - Click "Add Condition Group" to create a relationship
    - Choose between AND/OR logic
-   - Select which variables and values trigger the condition
+   - Select which variables and values are related
+
+### Exploring Relationships
+
+The dynamic UI helps you understand relationships between variables:
+
+1. **Visual States**:
+   - Default: All values are fully visible
+   - Related: Values with relationships are highlighted in light blue
+   - Incompatible: Values that conflict with current selections are dimmed
+   - Hover: Reveals potential relationships
+
+2. **Interaction**:
+   - Select values to see their relationships
+   - Related values in other variables are automatically highlighted
+   - Incompatible values are dimmed but remain accessible
+   - Deselect values to explore different combinations
+
+3. **Bidirectional Relationships**:
+   - Relationships work in both directions
+   - Selecting a value shows what it's related to
+   - Selecting a related value highlights what it's connected to
 
 ### Managing Schemas
 
@@ -62,62 +83,39 @@ A web-based tool for building and visualizing conditional schemas with a dynamic
 - **Download**: Click "Download Schema" to save as a JSON file
 - **Upload**: Use "Upload Schema" to load an existing schema
 
-### Using the Dynamic UI
-
-The dynamic UI section shows how your schema works in practice:
-1. Make selections from the dropdowns
-2. Watch as conditional elements appear/disappear
-3. See your current selections displayed in real-time
-
 ## Schema Structure
 
-The generated schema follows this format:
+The schema uses conditions to define relationships between values:
 
 ```json
 {
   "variables": [
     {
       "name": "string",
-      "type": "enum|info",
       "description": "string (optional)",
       "values": [
         {
-          "name": "string (for enum)",
-          "description": "string (for info)",
+          "name": "string",
           "conditions": {
             "allOf|anyOf": [
               {"variableName": "value"}
             ]
           }
         }
-      ],
-      "conditions": {
-        "allOf|anyOf": [
-          {"variableName": "value"}
-        ]
-      }
+      ]
     }
   ]
 }
 ```
 
+- `conditions`: Define relationships between values
+- `allOf`: All conditions must be met (AND logic)
+- `anyOf`: Any condition can be met (OR logic)
+
 ## Technical Details
 
 Built using:
 - Vanilla JavaScript (ES6+)
-- CSS3
+- CSS3 with smooth transitions
 - HTML5
 - Modular architecture for maintainability
-
-Files structure:
-```
-├── index.html
-├── css/
-│   └── styles.css
-└── js/
-    ├── main.js
-    └── modules/
-        ├── schemaBuilder.js
-        ├── dynamicUI.js
-        └── utils.js
-```

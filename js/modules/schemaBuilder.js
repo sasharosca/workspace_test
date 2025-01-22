@@ -10,11 +10,7 @@ export class SchemaBuilder {
     this.currentFileSpan = document.getElementById('currentFile');
     this.onSchemaChange = null;
     this.draggedElement = null;
-    this.dropPlaceholder = null;
-    this.lastDropTarget = null;
-    this.lastDropPosition = null;
-    
-    this.currentFile = null;
+    this.dropPlaceholder = createElement('div', {className: 'drop-placeholder'});
     this.currentFileHandle = null;
     
     this.setupEventListeners();
@@ -22,150 +18,111 @@ export class SchemaBuilder {
   }
 
   setupDragAndDrop() {
-    // Create placeholder element
-    this.dropPlaceholder = document.createElement('div');
-    this.dropPlaceholder.className = 'drop-placeholder';
-    
-    // Enable drag and drop on the container
     this.variablesContainer.addEventListener('dragover', (e) => {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
       
       if (!this.draggedElement) return;
       
-      const { element: targetElement, insertBefore } = this.getDropTarget(e.clientY);
-      if (!targetElement || targetElement === this.draggedElement) {
-        this.clearDropIndicator();
+      const { element: target, insertBefore } = this.getDropTarget(e.clientY);
+      if (!target || target === this.draggedElement) {
+        this.dropPlaceholder.remove();
         return;
       }
       
-      // Only update if position changed
-      if (targetElement !== this.lastDropTarget || insertBefore !== this.lastDropPosition) {
-        this.updateDropIndicator(targetElement, insertBefore ? 'top' : 'bottom');
-        this.lastDropTarget = targetElement;
-        this.lastDropPosition = insertBefore;
-      }
+      this.dropPlaceholder.className = `drop-placeholder ${insertBefore ? 'top' : 'bottom'}`;
+      target.appendChild(this.dropPlaceholder);
     });
 
     this.variablesContainer.addEventListener('dragleave', (e) => {
-      // Only clear if we're leaving the container
       if (!this.variablesContainer.contains(e.relatedTarget)) {
-        this.clearDropIndicator();
+        this.dropPlaceholder.remove();
       }
     });
 
     this.variablesContainer.addEventListener('drop', (e) => {
       e.preventDefault();
-      if (!this.draggedElement || !this.lastDropTarget) return;
+      if (!this.draggedElement || !this.dropPlaceholder.parentNode) return;
       
-      const insertBefore = this.lastDropPosition;
-      if (insertBefore) {
-        this.lastDropTarget.parentNode.insertBefore(this.draggedElement, this.lastDropTarget);
-      } else {
-        this.lastDropTarget.parentNode.insertBefore(this.draggedElement, this.lastDropTarget.nextSibling);
+      const target = this.dropPlaceholder.parentNode;
+      const insertBefore = this.dropPlaceholder.className.includes('top');
+      target.parentNode.insertBefore(
+        this.draggedElement, 
+        insertBefore ? target : target.nextSibling
+      );
+      
+      this.dropPlaceholder.remove();
+      if (this.onSchemaChange) {
+        this.onSchemaChange(this.buildSchema());
       }
-      
-      this.clearDropIndicator();
-      this.triggerSchemaUpdate();
+      if (this.currentFileHandle) {
+        this.saveCurrentSchema();
+      }
     });
   }
 
   getDropTarget(clientY) {
-    const children = Array.from(this.variablesContainer.children).filter(child => 
-      child !== this.draggedElement && child !== this.dropPlaceholder
-    );
+    const children = Array.from(this.variablesContainer.children)
+      .filter(child => child !== this.draggedElement && child !== this.dropPlaceholder);
     
     if (!children.length) return { element: null, insertBefore: false };
 
-    // Special case: above first element
     const firstChild = children[0];
     const firstRect = firstChild.getBoundingClientRect();
     if (clientY < firstRect.top + 10) {
       return { element: firstChild, insertBefore: true };
     }
 
-    // Special case: below last element
     const lastChild = children[children.length - 1];
     const lastRect = lastChild.getBoundingClientRect();
     if (clientY >= lastRect.bottom - 10) {
       return { element: lastChild, insertBefore: false };
     }
 
-    // Check each pair of elements for a drop position
     for (let i = 0; i < children.length; i++) {
-      const currentElement = children[i];
-      const currentRect = currentElement.getBoundingClientRect();
+      const current = children[i];
+      const currentRect = current.getBoundingClientRect();
       
-      // If this is the last element
       if (i === children.length - 1) {
-        return { element: currentElement, insertBefore: false };
+        return { element: current, insertBefore: false };
       }
       
-      const nextElement = children[i + 1];
-      const nextRect = nextElement.getBoundingClientRect();
+      const next = children[i + 1];
+      const nextRect = next.getBoundingClientRect();
+      const gapMiddle = (currentRect.bottom + nextRect.top) / 2;
       
-      // Calculate the gap region
-      const gapTop = currentRect.bottom;
-      const gapBottom = nextRect.top;
-      const gapMiddle = (gapTop + gapBottom) / 2;
-      
-      // If we're in the gap
-      if (clientY >= gapTop && clientY <= gapBottom) {
+      if (clientY >= currentRect.top && clientY < nextRect.top) {
         return {
-          element: clientY <= gapMiddle ? currentElement : nextElement,
+          element: clientY <= gapMiddle ? current : next,
           insertBefore: clientY > gapMiddle
-        };
-      }
-      
-      // If we're over the current element
-      if (clientY >= currentRect.top && clientY < gapTop) {
-        const elementMiddle = (currentRect.top + currentRect.bottom) / 2;
-        return {
-          element: currentElement,
-          insertBefore: clientY <= elementMiddle
         };
       }
     }
     
-    // Fallback
     return { element: lastChild, insertBefore: false };
-  }
-
-  updateDropIndicator(target, position) {
-    this.clearDropIndicator();
-    this.dropPlaceholder.className = `drop-placeholder ${position}`;
-    target.appendChild(this.dropPlaceholder);
-  }
-
-  clearDropIndicator() {
-    if (this.dropPlaceholder.parentNode) {
-      this.dropPlaceholder.remove();
-    }
-    this.lastDropTarget = null;
-    this.lastDropPosition = null;
-  }
-
-  showAddVariableButton() {
-    this.addVarBtn.style.display = 'block';
-  }
-
-  hideAddVariableButton() {
-    this.addVarBtn.style.display = 'none';
   }
 
   setupEventListeners() {
     this.addVarBtn.addEventListener('click', () => {
       this.addVariableUI(this.variablesContainer);
-      this.triggerSchemaUpdate();
+      if (this.onSchemaChange) {
+        this.onSchemaChange(this.buildSchema());
+      }
+      if (this.currentFileHandle) {
+        this.saveCurrentSchema();
+      }
     });
 
     this.newSchemaBtn.addEventListener('click', () => this.createNewSchema());
     this.openSchemaBtn.addEventListener('click', () => this.openSchemaFile());
     this.schemaFileInput.addEventListener('change', () => this.handleFileSelect());
-
-    // Listen for changes in the variables container
     this.variablesContainer.addEventListener('change', () => {
-      this.triggerSchemaUpdate();
+      if (this.onSchemaChange) {
+        this.onSchemaChange(this.buildSchema());
+      }
+      if (this.currentFileHandle) {
+        this.saveCurrentSchema();
+      }
     });
   }
 
@@ -179,13 +136,15 @@ export class SchemaBuilder {
       });
       
       this.currentFileHandle = handle;
-      this.currentFile = handle.name;
-      this.currentFileSpan.textContent = `Current file: ${this.currentFile}`;
-      
-      // Clear existing schema
+      this.currentFileSpan.textContent = `Current file: ${handle.name}`;
       this.variablesContainer.innerHTML = '';
-      this.showAddVariableButton();
-      this.triggerSchemaUpdate();
+      this.addVarBtn.style.display = 'block';
+      if (this.onSchemaChange) {
+        this.onSchemaChange(this.buildSchema());
+      }
+      if (this.currentFileHandle) {
+        this.saveCurrentSchema();
+      }
     } catch (err) {
       if (err.name !== 'AbortError') {
         console.error('Error creating new schema:', err);
@@ -203,13 +162,12 @@ export class SchemaBuilder {
       });
       
       this.currentFileHandle = handle;
-      this.currentFile = handle.name;
-      this.currentFileSpan.textContent = `Current file: ${this.currentFile}`;
+      this.currentFileSpan.textContent = `Current file: ${handle.name}`;
       
       const file = await handle.getFile();
       const content = await file.text();
       this.loadSchemaIntoBuilder(JSON.parse(content));
-      this.showAddVariableButton();
+      this.addVarBtn.style.display = 'block';
     } catch (err) {
       if (err.name !== 'AbortError') {
         console.error('Error opening schema file:', err);
@@ -230,31 +188,14 @@ export class SchemaBuilder {
     }
   }
 
-  triggerSchemaUpdate() {
-    if (this.onSchemaChange) {
-      const schema = this.buildSchema();
-      this.onSchemaChange(schema);
-    }
-    // Autosave when schema changes
-    if (this.currentFileHandle) {
-      this.saveCurrentSchema();
-    }
-  }
-
   addVariableUI(container, variableData=null) {
     const variableBlock = createElement('div', {className:'variable-entry'});
-    
-    // Create header for collapsible section
     const header = createElement('div', {className:'variable-header'});
-    
-    // Add drag handle
     const dragHandle = createElement('div', {className:'drag-handle'});
     dragHandle.draggable = true;
     
-    // Add expand/collapse icon
-    const expandIcon = createElement('span', {className:'expand-icon'}, ['▶']);
     header.appendChild(dragHandle);
-    header.appendChild(expandIcon);
+    header.appendChild(createElement('span', {className:'expand-icon'}, ['▶']));
     
     const summary = createElement('div', {className:'variable-summary'});
     summary.innerHTML = `
@@ -264,16 +205,13 @@ export class SchemaBuilder {
     `;
     header.appendChild(summary);
     
-    // Add delete button
-    const deleteBtn = createElement('button', {
+    header.appendChild(createElement('button', {
       className: 'delete-variable-btn',
       type: 'button'
-    }, ['×']);
-    header.appendChild(deleteBtn);
+    }, ['×']));
     
     variableBlock.appendChild(header);
 
-    // Setup drag events
     dragHandle.addEventListener('dragstart', (e) => {
       e.stopPropagation();
       e.dataTransfer.effectAllowed = 'move';
@@ -284,22 +222,16 @@ export class SchemaBuilder {
       });
     });
     
-    dragHandle.addEventListener('dragend', (e) => {
-      e.stopPropagation();
+    dragHandle.addEventListener('dragend', () => {
       this.draggedElement = null;
       variableBlock.classList.remove('dragging');
-      this.clearDropIndicator();
+      this.dropPlaceholder.remove();
     });
 
-    // Create content section (collapsed by default)
     const content = createElement('div', {className:'variable-content'});
     content.innerHTML = `
       <div class="form-row">
         <input type="text" class="var-name" placeholder="Variable Name (e.g. Level)">
-        <select class="var-type">
-          <option value="enum">Enum</option>
-          <option value="info">Info</option>
-        </select>
       </div>
       <div class="valuesContainer"></div>
       <button type="button" class="addValueBtn">Add Value</button>
@@ -309,52 +241,51 @@ export class SchemaBuilder {
     variableBlock.appendChild(content);
     container.appendChild(variableBlock);
 
-    // Setup event listeners
     header.addEventListener('click', (e) => {
-      // Don't toggle if clicking the delete button or drag handle
       if (!e.target.matches('.delete-variable-btn') && !e.target.closest('.drag-handle')) {
         variableBlock.classList.toggle('expanded');
       }
     });
 
-    // Setup delete button handler
-    deleteBtn.addEventListener('click', (e) => {
-      e.stopPropagation(); // Prevent header click
+    header.querySelector('.delete-variable-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
       if (confirm('Are you sure you want to delete this variable?')) {
         variableBlock.remove();
-        this.triggerSchemaUpdate();
+        if (this.onSchemaChange) {
+          this.onSchemaChange(this.buildSchema());
+        }
+        if (this.currentFileHandle) {
+          this.saveCurrentSchema();
+        }
       }
     });
 
     const updateSummary = () => {
-      const nameDisplay = summary.querySelector('.variable-name-display');
-      const typeDisplay = summary.querySelector('.variable-type-display');
-      const valuesCountDisplay = summary.querySelector('.variable-values-count');
-      
       const name = content.querySelector('.var-name').value.trim() || 'New Variable';
-      const type = content.querySelector('.var-type').value;
-      const valuesCount = content.querySelectorAll('.value-entry').length;
+      const count = content.querySelectorAll('.value-entry').length;
       
-      nameDisplay.textContent = name;
-      typeDisplay.textContent = type;
-      valuesCountDisplay.textContent = `${valuesCount} value${valuesCount !== 1 ? 's' : ''}`;
+      summary.querySelector('.variable-name-display').textContent = name;
+      summary.querySelector('.variable-type-display').textContent = 'enum';
+      summary.querySelector('.variable-values-count').textContent = 
+        `${count} value${count !== 1 ? 's' : ''}`;
     };
 
-    const varTypeSelect = content.querySelector('.var-type');
-    const nameInput = content.querySelector('.var-name');
-
-    [varTypeSelect, nameInput].forEach(el => {
-      el.addEventListener('change', updateSummary);
-      el.addEventListener('input', updateSummary);
-    });
+    content.querySelector('.var-name').addEventListener('change', updateSummary);
+    content.querySelector('.var-name').addEventListener('input', updateSummary);
 
     content.querySelector('.addConditionGroupBtn').addEventListener('click', () => {
       this.addConditionGroupUI(content.querySelector('.conditionsContainer'));
     });
+    
     content.querySelector('.addValueBtn').addEventListener('click', () => {
       this.addValueUI(content.querySelector('.valuesContainer'));
       updateSummary();
-      this.triggerSchemaUpdate();
+      if (this.onSchemaChange) {
+        this.onSchemaChange(this.buildSchema());
+      }
+      if (this.currentFileHandle) {
+        this.saveCurrentSchema();
+      }
     });
 
     if (variableData) {
@@ -365,10 +296,10 @@ export class SchemaBuilder {
     return variableBlock;
   }
 
-  addValueUI(container, valueData=null, varType=null) {
+  addValueUI(container, valueData=null) {
     const valEntry = createElement('div', {className:'value-entry'});
     valEntry.innerHTML = `
-      <input type="text" class="value-name" placeholder="Value Name/Description">
+      <input type="text" class="value-name" placeholder="Value Name">
       <div class="valueConditionsContainer"></div>
       <button type="button" class="addValueConditionGroupBtn">Add Condition Group</button>
     `;
@@ -379,7 +310,7 @@ export class SchemaBuilder {
     });
 
     if (valueData) {
-      valEntry.querySelector('.value-name').value = valueData.name || valueData.description || '';
+      valEntry.querySelector('.value-name').value = valueData.name || '';
       if (valueData.conditions) {
         this.populateConditions(valEntry.querySelector('.valueConditionsContainer'), valueData.conditions);
       }
@@ -407,8 +338,7 @@ export class SchemaBuilder {
     if (groupData) {
       const logic = Object.keys(groupData)[0];
       group.querySelector('.group-logic').value = logic;
-      const condArray = groupData[logic];
-      condArray.forEach(condObj => {
+      groupData[logic].forEach(condObj => {
         this.addConditionEntryUI(group.querySelector('.conditionEntriesContainer'), condObj);
       });
     }
@@ -417,8 +347,14 @@ export class SchemaBuilder {
   }
 
   addConditionEntryUI(container, entryData=null) {
+    const vars = Array.from(document.querySelectorAll('.variable-entry')).map(block => ({
+      name: block.querySelector('.var-name').value.trim(),
+      values: Array.from(block.querySelectorAll('.value-entry'))
+        .map(vb => vb.querySelector('.value-name').value.trim())
+        .filter(Boolean)
+    }));
+
     const entry = createElement('div', {className:'condition-entry'});
-    const vars = this.getCurrentBuilderVariables();
     entry.innerHTML = `
       <label>Variable:</label>
       <select class="cond-var-select">
@@ -430,25 +366,15 @@ export class SchemaBuilder {
     `;
     container.appendChild(entry);
 
-    this.setupConditionEntryListeners(entry, vars, entryData);
-    return entry;
-  }
-
-  setupConditionEntryListeners(entry, vars, entryData) {
     const varSelect = entry.querySelector('.cond-var-select');
     const valSelect = entry.querySelector('.cond-val-select');
 
     varSelect.addEventListener('change', () => {
       const selectedVar = vars.find(v => v.name === varSelect.value);
-      if (selectedVar && selectedVar.type === 'enum') {
-        valSelect.innerHTML = selectedVar.values.map(val => 
-          `<option value="${val}">${val}</option>`
-        ).join('');
-        valSelect.disabled = false;
-      } else {
-        valSelect.innerHTML = `<option value="">No values</option>`;
-        valSelect.disabled = true;
-      }
+      valSelect.innerHTML = selectedVar
+        ? selectedVar.values.map(val => `<option value="${val}">${val}</option>`).join('')
+        : '<option value="">No values</option>';
+      valSelect.disabled = !selectedVar;
     });
 
     if (entryData) {
@@ -457,148 +383,115 @@ export class SchemaBuilder {
       varSelect.dispatchEvent(new Event('change'));
       valSelect.value = cVal;
     }
-  }
 
-  getCurrentBuilderVariables() {
-    const varBlocks = document.querySelectorAll('.variable-entry');
-    return Array.from(varBlocks).map(block => {
-      const varName = block.querySelector('.var-name').value.trim();
-      const varType = block.querySelector('.var-type').value;
-      const values = this.extractValuesForVars(varType, block);
-      return {name: varName, type: varType, values};
-    });
-  }
-
-  extractValuesForVars(varType, block) {
-    const valBlocks = block.querySelectorAll('.value-entry');
-    return Array.from(valBlocks)
-      .map(vb => vb.querySelector('.value-name').value.trim())
-      .filter(Boolean);
+    return entry;
   }
 
   buildSchema() {
-    return { variables: this.buildSchemaVariables() };
-  }
+    return { variables: Array.from(document.querySelectorAll('.variable-entry'))
+      .map(block => {
+        const varObj = {
+          name: block.querySelector('.var-name').value.trim(),
+          type: 'enum'
+        };
 
-  buildSchemaVariables() {
-    const varBlocks = document.querySelectorAll('.variable-entry');
-    return Array.from(varBlocks).map(block => this.buildVariableObject(block));
-  }
+        const values = Array.from(block.querySelectorAll('.value-entry'))
+          .map(vb => {
+            const name = vb.querySelector('.value-name').value.trim();
+            if (!name) return null;
+            
+            const vObj = { name };
+            const conditions = this.buildConditionsJSON(
+              vb.querySelectorAll('.valueConditionsContainer > .condition-group')
+            );
+            if (Object.keys(conditions).length) vObj.conditions = conditions;
+            
+            return vObj;
+          })
+          .filter(Boolean);
 
-  buildVariableObject(block) {
-    const varName = block.querySelector('.var-name').value.trim();
-    const varType = block.querySelector('.var-type').value;
-    
-    let varObj = {name: varName, type: varType};
+        if (values.length) varObj.values = values;
 
-    const values = this.buildValues(block, varType);
-    if (values.length > 0) varObj.values = values;
+        const conditions = this.buildConditionsJSON(
+          block.querySelectorAll('.conditionsContainer > .condition-group')
+        );
+        if (Object.keys(conditions).length) varObj.conditions = conditions;
 
-    const conditions = this.buildConditionsJSON(
-      block.querySelectorAll('.conditionsContainer > .condition-group')
-    );
-    if (Object.keys(conditions).length > 0) varObj.conditions = conditions;
-
-    return varObj;
-  }
-
-  buildValues(block, varType) {
-    const valBlocks = block.querySelectorAll('.value-entry');
-    const values = [];
-    
-    valBlocks.forEach(vb => {
-      const vName = vb.querySelector('.value-name').value.trim();
-      if (!vName) return;
-      
-      const vConditions = this.buildConditionsJSON(
-        vb.querySelectorAll('.valueConditionsContainer > .condition-group')
-      );
-      
-      const vObj = varType === 'enum' ? {name: vName} : {description: vName};
-      if (Object.keys(vConditions).length > 0) vObj.conditions = vConditions;
-      
-      values.push(vObj);
-    });
-    
-    return values;
+        return varObj;
+      })
+    };
   }
 
   buildConditionsJSON(condGroups) {
-    if (condGroups.length === 0) return {};
-    if (condGroups.length === 1) return this.extractGroupConditions(condGroups[0]);
+    if (!condGroups.length) return {};
+    if (condGroups.length === 1) {
+      const groupEl = condGroups[0];
+      const logic = groupEl.querySelector('.group-logic').value;
+      const conditions = Array.from(groupEl.querySelectorAll('.condition-entry'))
+        .map(entry => {
+          const cVar = entry.querySelector('.cond-var-select').value.trim();
+          const cVal = entry.querySelector('.cond-val-select').value.trim();
+          return cVar && cVal ? {[cVar]: cVal} : null;
+        })
+        .filter(Boolean);
+      
+      return conditions.length ? {[logic]: conditions} : {};
+    }
     
-    const allGroups = [];
-    condGroups.forEach(g => {
-      const c = this.extractGroupConditions(g);
-      if (Object.keys(c).length > 0) allGroups.push(c);
-    });
+    const groups = Array.from(condGroups)
+      .map(groupEl => {
+        const logic = groupEl.querySelector('.group-logic').value;
+        const conditions = Array.from(groupEl.querySelectorAll('.condition-entry'))
+          .map(entry => {
+            const cVar = entry.querySelector('.cond-var-select').value.trim();
+            const cVal = entry.querySelector('.cond-val-select').value.trim();
+            return cVar && cVal ? {[cVar]: cVal} : null;
+          })
+          .filter(Boolean);
+        
+        return conditions.length ? {[logic]: conditions} : null;
+      })
+      .filter(Boolean);
     
-    return allGroups.length > 0 ? { allOf: allGroups } : {};
-  }
-
-  extractGroupConditions(groupEl) {
-    const logic = groupEl.querySelector('.group-logic').value;
-    const condEntries = groupEl.querySelectorAll('.condition-entry');
-    const groupArray = [];
-    
-    condEntries.forEach(entry => {
-      const cVar = entry.querySelector('.cond-var-select').value.trim();
-      const cVal = entry.querySelector('.cond-val-select').value.trim();
-      if (cVar && cVal) {
-        let cObj = {};
-        cObj[cVar] = cVal;
-        groupArray.push(cObj);
-      }
-    });
-    
-    if (groupArray.length === 0) return {};
-    return {[logic]: groupArray};
+    return groups.length ? { allOf: groups } : {};
   }
 
   loadSchemaIntoBuilder(json) {
     this.variablesContainer.innerHTML = '';
-
-    if (!json.variables) return;
-    json.variables.forEach(v => {
+    (json.variables || []).forEach(v => {
       this.addVariableUI(this.variablesContainer, v);
     });
-    this.triggerSchemaUpdate();
+    if (this.onSchemaChange) {
+      this.onSchemaChange(this.buildSchema());
+    }
+    if (this.currentFileHandle) {
+      this.saveCurrentSchema();
+    }
   }
 
   populateVariableData(block, data) {
-    // Ensure the block starts collapsed
     block.classList.remove('expanded');
-    
     const content = block.querySelector('.variable-content');
     content.querySelector('.var-name').value = data.name || '';
-    content.querySelector('.var-type').value = data.type || 'enum';
 
-    // Populate values
-    const valuesContainer = content.querySelector('.valuesContainer');
     (data.values || []).forEach(value => {
-      this.addValueUI(valuesContainer, value, data.type);
+      this.addValueUI(content.querySelector('.valuesContainer'), value);
     });
 
-    // Populate conditions
     if (data.conditions) {
-      const conditionsContainer = content.querySelector('.conditionsContainer');
-      this.populateConditions(conditionsContainer, data.conditions);
+      this.populateConditions(content.querySelector('.conditionsContainer'), data.conditions);
     }
 
-    // Update the summary display
-    const updateEvent = new Event('change');
-    content.querySelector('.var-name').dispatchEvent(updateEvent);
+    content.querySelector('.var-name').dispatchEvent(new Event('change'));
   }
 
   populateConditions(container, conditionsData) {
-    if (!conditionsData || Object.keys(conditionsData).length === 0) return;
+    if (!conditionsData || !Object.keys(conditionsData).length) return;
     
-    // If top-level allOf or anyOf
     if (conditionsData.allOf || conditionsData.anyOf) {
       this.addConditionGroupUI(container, conditionsData);
     } else {
-      // No allOf/anyOf, single condition set
       this.addConditionGroupUI(container, { allOf: [conditionsData] });
     }
   }
-} 
+}
